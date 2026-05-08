@@ -1,0 +1,46 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-smartcleaner}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-smartcleaner_dev_pw}
+      POSTGRES_DB: ${POSTGRES_DB:-smartcleaner}
+    ports:
+      # Host-side 5433 to avoid clashing with a native Windows postgres.exe
+      # that may already be bound to 5432.
+      - "5433:5432"
+    volumes:
+      - smartcleaner-pg:/var/lib/postgresql/data
+      - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-smartcleaner} -d ${POSTGRES_DB:-smartcleaner}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build: .
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - AI_PROVIDER=${AI_PROVIDER:-gemini}
+      - JWT_SECRET=${JWT_SECRET}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-smartcleaner}:${POSTGRES_PASSWORD:-smartcleaner_dev_pw}@postgres:5432/${POSTGRES_DB:-smartcleaner}
+    volumes:
+      - smartcleaner-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  smartcleaner-pg:
+  smartcleaner-data:
