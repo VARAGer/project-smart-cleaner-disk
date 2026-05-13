@@ -154,6 +154,10 @@ Logs must avoid:
 
 ## Testing Scope
 
+Testing is split into two layers.
+
+### Layer 1 - deterministic backend tests
+
 Unit and mocked integration coverage should prove:
 
 1. Gemini success short-circuits the fallback path.
@@ -163,6 +167,50 @@ Unit and mocked integration coverage should prove:
 5. LM Studio success returns validated classifications.
 6. LM Studio failure falls through to backend defaults.
 7. Existing API-level behavior remains stable for `/api/analyze`.
+
+These tests must stay fast, deterministic, and independent from real network
+or local model availability.
+
+### Layer 2 - real-provider evaluation runs
+
+The repository already contains deterministic seeded file generators in
+`server/tests/factories.py`. The implementation plan should add an opt-in
+evaluation harness that reuses those generators to exercise the real providers
+directly.
+
+The evaluation harness should:
+
+- Produce at least two large deterministic batches, each containing `200`
+  files.
+- Send the exact same generated batches to Gemini and to LM Studio.
+- Validate the returned payloads automatically:
+  - JSON parses successfully.
+  - Expected top-level structure exists.
+  - Every requested `file_id` appears exactly once.
+  - No unexpected `file_id` is returned.
+  - `confidence` is within `[0.0, 1.0]`.
+  - `category` belongs to the allowed category set.
+  - `reason` is non-empty.
+- Persist raw provider responses and normalized validation summaries as local
+  evaluation artifacts for manual review.
+
+These real-provider runs should be explicit developer-invoked checks rather
+than mandatory CI gates, because they depend on external API/network state and
+on a locally running LM Studio server.
+
+### Semantic review
+
+Structural validity does not fully prove classification quality. After the real
+provider runs, the resulting JSON payloads can be reviewed manually to compare
+Gemini and LM Studio on:
+
+- Overconfident deletion recommendations.
+- Incorrect or weak category selection.
+- Reasons that are syntactically valid but semantically unhelpful.
+- Stability on ambiguous or borderline files.
+
+The design assumes that this semantic review may be performed outside the
+automated test runner when needed.
 
 ## Non-Goals
 
