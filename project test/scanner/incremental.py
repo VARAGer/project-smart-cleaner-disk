@@ -2,21 +2,20 @@ import os
 import sqlite3
 from datetime import datetime
 import hashlib
-from config import DB_PATH, SKIP_DIRS, SYSTEM_EXTENSION
+from client.config import (DB_PATH, SKIP_DIRS, SYSTEM_EXTENSIONS)
 class IncrementalScanner:
     BATCH_SIZE = 500
     
     
-    def __init__(self, db_path: str = DB_PATH):
+    def __init__(self, db_path = DB_PATH):
         self.db_path = db_path
         conn = sqlite3.connect(self.db_path)
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA foreign_keys=ON")
-        
+    def scan(self, root_path, disk_label, progress_callback=None):
         existing = {}
         rows = conn.execute(
-            "SELECT file_id, path, modified_at FROM scanned_files"
-            "WHERE disk_label = ?",
+            "SELECT file_id, path, modified_at FROM scanned_filesWHERE disk_label = ?",
             (disk_label,)
         ).fetchall()
         for row in rows:
@@ -24,7 +23,7 @@ class IncrementalScanner:
                 "file_id": row[0],
                 "modified_at": row[2]
             }
-        stats = {"neew": 0, "updated": 0, "deleted":0, "unchanged":0}
+        stats = {"new": 0, "update": 0, "deleted":0, "unchanged":0}
         seen_path = set()
         batch = []
         
@@ -37,8 +36,7 @@ class IncrementalScanner:
                      stats["unchanged"] += 1
                      continue
                  else:
-                     file_info["file_id"] = existing[path]
-                     ["file_id"]
+                     file_info["file_id"] = existing[path]["file_id"]
                      batch.append(("update", file_info))
                      stats["updated"] += 1
             else:
@@ -55,7 +53,7 @@ class IncrementalScanner:
             self._flush_batch(conn,batch)
         deleted_paths = set(existing.keys()) - seen_paths
         if deleted_paths:
-            for chunk in self._chinks(list(deleted_paths), 900):
+            for chunk in self._chunk(list(deleted_paths), 900):
                 placeholders = ",".join("?" * len(chunk))
                 conn.execute(
                     f"DELETE FROM scanned_files"

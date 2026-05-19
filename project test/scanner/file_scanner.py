@@ -27,9 +27,9 @@ def scan_directory(root_path:str, disk_label:str, progress_callback = None, _cou
                         )
                 elif entry.is_file(follow_symlinks = False):
                     stat = entry.stat()
-                    extension = os.path.splittext(enrty.name)[1].lower()
+                    extension = os.path.splitext(entry.name)[1].lower()
 
-                    if extension in SYSTEM_EXTENSION:
+                    if extension in SYSTEM_EXTENSIONS:
                         continue
                     _counter[0] += 1
                     if progress_callback and _counter[0] % 1000 == 0:

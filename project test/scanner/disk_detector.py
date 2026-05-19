@@ -8,7 +8,7 @@ def get_avaible_disks() -> list[dict]:
             usage = psutil.disk_usage(partition.mountpoint)#считывает данные на дискаче
         except PermissionError:
             continue
-        disks.append = ({
+        disks.append({
             "device": partition.device,
             "mountpoint": partition.mountpoint,
             "fstype": partition.fstype,
