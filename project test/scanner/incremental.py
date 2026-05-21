@@ -9,10 +9,12 @@ class IncrementalScanner:
     
     def __init__(self, db_path = DB_PATH):
         self.db_path = db_path
+        
+    
+    def scan(self, root_path, disk_label, progress_callback=None):
         conn = sqlite3.connect(self.db_path)
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA foreign_keys=ON")
-    def scan(self, root_path, disk_label, progress_callback=None):
         existing = {}
         rows = conn.execute(
             "SELECT file_id, path, modified_at FROM scanned_filesWHERE disk_label = ?",
@@ -24,7 +26,7 @@ class IncrementalScanner:
                 "modified_at": row[2]
             }
         stats = {"new": 0, "update": 0, "deleted":0, "unchanged":0}
-        seen_path = set()
+        seen_paths = set()
         batch = []
         
         for file_info in self._walk(root_path, disk_label):

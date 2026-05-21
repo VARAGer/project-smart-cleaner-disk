@@ -1,5 +1,5 @@
 import psutil
-def get_avaible_disks() -> list[dict]:
+def get_available_disks() -> list[dict]:
     disks = []
     for partition in psutil.disk_partitions(all = False): #проверяет только реальные диски
         if "cdrom" in partition.opts or partition.fstype == "": #ббудет пропускать не нужные диски по типу флэхи или двд диски
