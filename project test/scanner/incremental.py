@@ -137,7 +137,6 @@ class IncrementalScanner:
                     (f["size_bytes"], f["modified_at"],
                      f["accessed_at"], f["file_id"])
                 )
-        conn.commit()
     @staticmethod
     def _chunk(lst, n):
         for i in range(0, len(lst), n):
