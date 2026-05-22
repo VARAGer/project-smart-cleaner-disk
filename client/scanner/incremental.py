@@ -2,7 +2,10 @@ import os
 import sqlite3
 from datetime import datetime
 import hashlib
+
 from client.config import (DB_PATH, SKIP_DIRS, SYSTEM_EXTENSIONS)
+
+
 class IncrementalScanner:
     BATCH_SIZE = 500
     
@@ -17,7 +20,7 @@ class IncrementalScanner:
         conn.execute("PRAGMA foreign_keys=ON")
         existing = {}
         rows = conn.execute(
-            "SELECT file_id, path, modified_at FROM scanned_filesWHERE disk_label = ?",
+            "SELECT file_id, path, modified_at FROM scanned_files WHERE disk_label = ?",
             (disk_label,)
         ).fetchall()
         for row in rows:
@@ -40,7 +43,7 @@ class IncrementalScanner:
                  else:
                      file_info["file_id"] = existing[path]["file_id"]
                      batch.append(("update", file_info))
-                     stats["updated"] += 1
+                     stats["update"] += 1
             else:
                 batch.append(("insert", file_info))
                 stats["new"] += 1
@@ -58,14 +61,13 @@ class IncrementalScanner:
             for chunk in self._chunk(list(deleted_paths), 900):
                 placeholders = ",".join("?" * len(chunk))
                 conn.execute(
-                    f"DELETE FROM scanned_files"
-                    f"WHERE path IN ({placeholders})",
+                    f"DELETE FROM scanned_files WHERE path IN ({placeholders})",
                     chunk
                 )
             conn.commit()
             stats["deleted"] = len(deleted_paths)
-        conn.execute("INSERT OR REPLACE INTO user_settings (key, value)"
-                     "VALUES(?, ?)",
+        conn.execute("INSERT OR REPLACE INTO user_settings (key, value) "
+                     "VALUES (?, ?)",
                      ("last_scan_date", datetime.now().isoformat())
                     )
         conn.commit()

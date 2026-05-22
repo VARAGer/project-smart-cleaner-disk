@@ -2,7 +2,7 @@
 import os
 import hashlib
 from datetime import datetime
-from config import SKIP_DIRS, SYSTEM_EXTENSIONS
+from client.config import SKIP_DIRS, SYSTEM_EXTENSIONS
 
 
 def generate_file_id(file_path: str) -> str:

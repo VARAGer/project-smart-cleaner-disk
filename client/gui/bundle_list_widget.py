@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
 
 from client.gui.demo_data import get_demo_bundles
 from client.gui.theme import refresh_style, set_variant
-from client.utils.utils import format_size
+from client.utils.formatters import format_size
 
 
 class BundleCard(QFrame):

@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
 )
 
 from client.gui.theme import set_variant
-from client.utils.utils import format_duration
+from client.utils.formatters import format_duration
 
 
 class ScanProgressScreen(QWidget):
