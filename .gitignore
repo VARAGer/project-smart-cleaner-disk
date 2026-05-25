@@ -31,6 +31,8 @@ client/data/
 # Build outputs
 build/
 dist/
+deployment/client-installer/output/
+deployment/client-installer/temp/
 *.spec.bak
 
 # IDE
@@ -42,3 +44,6 @@ graphify-out/
 
 # AI-slop files
 *.md
+.codex_tmp/
+graphify-out-current/
+docs/

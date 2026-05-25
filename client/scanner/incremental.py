@@ -1,9 +1,10 @@
 import os
 import sqlite3
 from datetime import datetime
-import hashlib
 
 from client.config import (DB_PATH, SKIP_DIRS, SYSTEM_EXTENSIONS)
+from client.database.local_db import init_database
+from client.scanner.file_ids import generate_file_id
 
 
 class IncrementalScanner:
@@ -12,74 +13,89 @@ class IncrementalScanner:
     
     def __init__(self, db_path = DB_PATH):
         self.db_path = db_path
+        self.data_dir = os.path.dirname(db_path) or None
         
     
-    def scan(self, root_path, disk_label, progress_callback=None):
+    def scan(self, root_path, disk_label, progress_callback=None, cancel_requested=None):
+        init_database(self.db_path)
         conn = sqlite3.connect(self.db_path)
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA foreign_keys=ON")
-        existing = {}
-        rows = conn.execute(
-            "SELECT file_id, path, modified_at FROM scanned_files WHERE disk_label = ?",
-            (disk_label,)
-        ).fetchall()
-        for row in rows:
-            existing[row[1]] = {
-                "file_id": row[0],
-                "modified_at": row[2]
-            }
-        stats = {"new": 0, "update": 0, "deleted":0, "unchanged":0}
-        seen_paths = set()
-        batch = []
-        
-        for file_info in self._walk(root_path, disk_label):
-            path = file_info["path"]
-            seen_paths.add(path)
+        try:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA foreign_keys=ON")
+            existing = {}
+            rows = conn.execute(
+                "SELECT file_id, path, modified_at FROM scanned_files WHERE disk_label = ?",
+                (disk_label,)
+            ).fetchall()
+            for row in rows:
+                existing[row[1]] = {
+                    "file_id": row[0],
+                    "modified_at": row[2]
+                }
+            stats = {"new": 0, "update": 0, "deleted":0, "unchanged":0}
+            seen_paths = set()
+            batch = []
+            was_cancelled = False
             
-            if path in existing:
-                 if existing[path]["modified_at"] == file_info["modified_at"]:
-                     stats["unchanged"] += 1
-                     continue
-                 else:
-                     file_info["file_id"] = existing[path]["file_id"]
-                     batch.append(("update", file_info))
-                     stats["update"] += 1
-            else:
-                batch.append(("insert", file_info))
-                stats["new"] += 1
-            if len(batch) >= self.BATCH_SIZE:
-                self._flush_batch(conn, batch)
-                batch.clear()
+            for file_info in self._walk(root_path, disk_label):
+                if cancel_requested and cancel_requested():
+                    was_cancelled = True
+                    break
+                path = file_info["path"]
+                seen_paths.add(path)
                 
+                if path in existing:
+                     if existing[path]["modified_at"] == file_info["modified_at"]:
+                         stats["unchanged"] += 1
+                         continue
+                     else:
+                         file_info["file_id"] = existing[path]["file_id"]
+                         batch.append(("update", file_info))
+                         stats["update"] += 1
+                else:
+                    batch.append(("insert", file_info))
+                    stats["new"] += 1
+                if len(batch) >= self.BATCH_SIZE:
+                    self._flush_batch(conn, batch)
+                    batch.clear()
+
+                total = stats["new"] + stats["update"] + stats["unchanged"]
+                if progress_callback and total % self.BATCH_SIZE == 0:
+                    progress_callback(total)
+            if was_cancelled:
+                conn.rollback()
+                stats["total"] = sum(stats.values())
+                return stats
+            if batch:
+                self._flush_batch(conn,batch)
             if progress_callback:
                 total = stats["new"] + stats["update"] + stats["unchanged"]
                 progress_callback(total)
-        if batch:
-            self._flush_batch(conn,batch)
-        deleted_paths = set(existing.keys()) - seen_paths
-        if deleted_paths:
-            for chunk in self._chunk(list(deleted_paths), 900):
-                placeholders = ",".join("?" * len(chunk))
-                conn.execute(
-                    f"DELETE FROM scanned_files WHERE path IN ({placeholders})",
-                    chunk
-                )
-            conn.commit()
-            stats["deleted"] = len(deleted_paths)
-        conn.execute("INSERT OR REPLACE INTO user_settings (key, value) "
-                     "VALUES (?, ?)",
-                     ("last_scan_date", datetime.now().isoformat())
+            deleted_paths = set(existing.keys()) - seen_paths
+            if deleted_paths:
+                for chunk in self._chunk(list(deleted_paths), 900):
+                    placeholders = ",".join("?" * len(chunk))
+                    conn.execute(
+                        f"DELETE FROM scanned_files WHERE path IN ({placeholders})",
+                        chunk
                     )
-        conn.commit()
-        conn.close()
-        stats["total"] = sum(stats.values())
-        return stats
+                conn.commit()
+                stats["deleted"] = len(deleted_paths)
+            conn.execute("INSERT OR REPLACE INTO user_settings (key, value) "
+                         "VALUES (?, ?)",
+                         ("last_scan_date", datetime.now().isoformat())
+                        )
+            conn.commit()
+            stats["total"] = sum(stats.values())
+            return stats
+        finally:
+            conn.close()
     
     
     
     
     def _walk(self, root_path: str, disk_label: str):
-        """Генератор файлов. Аналогичен file_scanner.scan_directory()."""
+        """Yield file metadata while keeping full paths local-only."""
         try:
             for entry in os.scandir(root_path):
                 try:
@@ -95,9 +111,10 @@ class IncrementalScanner:
                         if ext in SYSTEM_EXTENSIONS:
                             continue
                         yield {
-                            "file_id": hashlib.md5(
-                                entry.path.encode("utf-8")
-                            ).hexdigest()[:12],
+                            "file_id": generate_file_id(
+                                entry.path,
+                                data_dir=self.data_dir,
+                            ),
                             "path": entry.path,
                             "filename": entry.name,
                             "extension": ext,

@@ -11,7 +11,7 @@ no teardown races from dropped tables).
 """
 
 import os
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import pytest
 import pytest_asyncio
@@ -34,6 +34,13 @@ POSTGRES_TEST_URL = os.environ.get(
 
 # Skip all integration tests if Postgres isn't reachable.
 pytestmark = pytest.mark.integration
+
+
+def pytest_collection_modifyitems(items):
+    for item in items:
+        path = str(item.fspath).replace("\\", "/")
+        if "/tests/integration/" in path:
+            item.add_marker(pytest.mark.integration)
 
 
 @pytest_asyncio.fixture

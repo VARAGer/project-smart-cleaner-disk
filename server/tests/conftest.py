@@ -13,12 +13,10 @@ import os
 os.environ.setdefault("ENV", "test")
 os.environ.setdefault("JWT_SECRET", "test-secret-key-longer-than-32-characters")
 os.environ.setdefault("GEMINI_API_KEY", "test-gemini-key")
-os.environ.setdefault("GROQ_API_KEY", "test-groq-key")
-os.environ.setdefault("AI_PROVIDER", "gemini")
 # Faster bcrypt under tests — production sets this to 13 in config.
 os.environ.setdefault("BCRYPT_ROUNDS", "4")
 
-from typing import AsyncGenerator  # noqa: E402
+from collections.abc import AsyncGenerator  # noqa: E402
 
 import pytest_asyncio  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402

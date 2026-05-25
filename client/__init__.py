@@ -3,7 +3,12 @@
 import json
 import os
 
-from client.config import DATA_DIR, DEFAULT_MIN_AGE_MONTHS, DEFAULT_MIN_SIZE_BYTES, DEFAULT_SKIP_DURATION_DAYS
+from client.config import (
+    DATA_DIR,
+    DEFAULT_MIN_AGE_MONTHS,
+    DEFAULT_MIN_SIZE_BYTES,
+    DEFAULT_SKIP_DURATION_DAYS,
+)
 
 _SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
 
@@ -12,6 +17,7 @@ _DEFAULTS: dict = {
     "min_age_months": DEFAULT_MIN_AGE_MONTHS,
     "min_size_bytes": DEFAULT_MIN_SIZE_BYTES,
     "skip_duration_days": DEFAULT_SKIP_DURATION_DAYS,
+    "skip_review_mode": "days",
 }
 
 

@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import RATE_LIMIT_LOGIN, RATE_LIMIT_REGISTER
 from database.db import get_session
-from models.schemas import AuthRequest, AuthResponse
+from models.schemas import AuthResponse, LoginRequest, RegisterRequest
 from models.user import User
 from rate_limit import limiter
 from services.auth_service import (
@@ -32,7 +32,7 @@ def _client_ip(request: Request) -> str:
 @limiter.limit(RATE_LIMIT_REGISTER)
 async def register(
     request: Request,
-    payload: AuthRequest,
+    payload: RegisterRequest,
     session: AsyncSession = Depends(get_session),
 ):
     ip = _client_ip(request)
@@ -94,7 +94,7 @@ async def register(
 @limiter.limit(RATE_LIMIT_LOGIN)
 async def login(
     request: Request,
-    payload: AuthRequest,
+    payload: LoginRequest,
     session: AsyncSession = Depends(get_session),
 ):
     ip = _client_ip(request)

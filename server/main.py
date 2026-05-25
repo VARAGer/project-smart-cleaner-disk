@@ -17,6 +17,7 @@ from middleware import (
     RequestIdLogFilter,
     RequestIdMiddleware,
     SecurityHeadersMiddleware,
+    request_id_var,
 )
 from rate_limit import limiter
 from routers import analysis, auth
@@ -27,6 +28,24 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] [rid=%(request_id)s] %(name)s: %(message)s",
 )
+
+
+def _install_request_id_log_record_factory() -> None:
+    current_factory = logging.getLogRecordFactory()
+    if getattr(current_factory, "_smartcleaner_request_id", False):
+        return
+
+    def factory(*args, **kwargs):
+        record = current_factory(*args, **kwargs)
+        if not hasattr(record, "request_id"):
+            record.request_id = request_id_var.get()
+        return record
+
+    factory._smartcleaner_request_id = True
+    logging.setLogRecordFactory(factory)
+
+
+_install_request_id_log_record_factory()
 logging.getLogger().addFilter(RequestIdLogFilter())
 
 
@@ -86,3 +105,8 @@ app.include_router(analysis.router)
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
+
+
+@app.get("/api/health")
+async def api_health_check():
+    return await health_check()

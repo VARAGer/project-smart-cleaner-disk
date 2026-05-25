@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, field_validator
 
 # ===== Authentication =====
 
-class AuthRequest(BaseModel):
+class RegisterRequest(BaseModel):
     username: str = Field(
         ...,
         min_length=3,
@@ -41,8 +41,27 @@ class AuthRequest(BaseModel):
         if not (has_letter and has_digit):
             raise ValueError(
                 "Пароль должен содержать хотя бы одну букву и одну цифру"
-            )
+        )
         return v
+
+
+class LoginRequest(BaseModel):
+    username: str = Field(
+        ...,
+        min_length=1,
+        max_length=50,
+        description="Логин пользователя",
+    )
+    password: str = Field(
+        ...,
+        min_length=1,
+        max_length=128,
+        description="Пароль пользователя",
+    )
+
+
+# Backward-compatible name for older imports/tests.
+AuthRequest = RegisterRequest
 
 
 class AuthResponse(BaseModel):
@@ -59,7 +78,7 @@ class FileMetadata(BaseModel):
         ...,
         min_length=1,
         max_length=20,
-        description="Уникальный ID файла (MD5 хеш от пути)",
+        description="Непрозрачный клиентский ID файла",
     )
     filename: str = Field(
         ...,

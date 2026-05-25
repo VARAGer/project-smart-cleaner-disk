@@ -7,8 +7,9 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-smartcleaner}
     ports:
       # Host-side 5433 to avoid clashing with a native Windows postgres.exe
-      # that may already be bound to 5432.
-      - "5433:5432"
+      # that may already be bound to 5432. Keep it loopback-only; the public
+      # presentation path is Funnel -> backend, never direct database access.
+      - "127.0.0.1:5433:5432"
     volumes:
       - smartcleaner-pg:/var/lib/postgresql/data
       - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro
@@ -26,14 +27,27 @@ services:
   backend:
     build: .
     ports:
-      - "8000:8000"
+      # Keep the backend loopback-only by default. Presentation scripts expose
+      # this local port through an explicit tunnel instead of opening the
+      # container directly to the network.
+      - "${BACKEND_HOST_IP:-127.0.0.1}:8000:8000"
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - GROQ_API_KEY=${GROQ_API_KEY}
-      - AI_PROVIDER=${AI_PROVIDER:-gemini}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash-lite}
+      - GEMINI_FALLBACK_MODELS=${GEMINI_FALLBACK_MODELS:-gemini-2.0-flash-lite}
+      - XAI_API_KEY=${XAI_API_KEY:-}
+      - XAI_MODEL=${XAI_MODEL:-grok-3-mini}
+      - XAI_API_BASE_URL=${XAI_API_BASE_URL:-https://api.x.ai/v1}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - GROQ_MODEL=${GROQ_MODEL:-llama-3.1-8b-instant}
+      - GROQ_API_BASE_URL=${GROQ_API_BASE_URL:-https://api.groq.com/openai/v1}
+      - AI_TOTAL_TIMEOUT_SECONDS=${AI_TOTAL_TIMEOUT_SECONDS:-25.0}
+      - AI_MAX_RETRIES=${AI_MAX_RETRIES:-1}
+      - AI_RETRY_BASE_SECONDS=${AI_RETRY_BASE_SECONDS:-1.0}
+      - AI_RETRY_MAX_SECONDS=${AI_RETRY_MAX_SECONDS:-8.0}
       - JWT_SECRET=${JWT_SECRET}
       - CORS_ORIGINS=${CORS_ORIGINS:-*}
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-smartcleaner}:${POSTGRES_PASSWORD:-smartcleaner_dev_pw}@postgres:5432/${POSTGRES_DB:-smartcleaner}

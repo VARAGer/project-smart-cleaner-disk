@@ -1,6 +1,7 @@
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
     QButtonGroup,
+    QComboBox,
     QFormLayout,
     QFrame,
     QGridLayout,
@@ -119,6 +120,19 @@ class SettingsScreen(QWidget):
         self.age_spin.setSingleStep(1)
         self.age_spin.setValue(self.settings.get("min_age_months", config.DEFAULT_MIN_AGE_MONTHS))
 
+        self.size_spin = QSpinBox()
+        self.size_spin.setRange(1, 10 * 1024 * 1024)
+        self.size_spin.setSuffix(" КБ")
+        self.size_spin.setSingleStep(1)
+        self.size_spin.setValue(
+            _bytes_to_kib_setting(
+                self.settings.get(
+                    "min_size_bytes",
+                    config.DEFAULT_MIN_SIZE_BYTES,
+                )
+            )
+        )
+
         self.skip_spin = QSpinBox()
         self.skip_spin.setRange(1, 365)
         self.skip_spin.setSuffix(" дн.")
@@ -127,8 +141,19 @@ class SettingsScreen(QWidget):
             self.settings.get("skip_duration_days", config.DEFAULT_SKIP_DURATION_DAYS)
         )
 
+        self.review_mode_combo = QComboBox()
+        self.review_mode_combo.addItem("Обычный режим", "days")
+        self.review_mode_combo.addItem("Демо: пересмотр через 1 минуту", "demo_minute")
+        mode_index = self.review_mode_combo.findData(
+            self.settings.get("skip_review_mode", "days")
+        )
+        self.review_mode_combo.setCurrentIndex(max(0, mode_index))
+        self.review_mode_combo.currentIndexChanged.connect(self.update_review_mode_state)
+
         form.addRow("Мин. возраст файла:", self.age_spin)
+        form.addRow("Мин. размер файла:", self.size_spin)
         form.addRow("Период пропуска:", self.skip_spin)
+        form.addRow("Режим пересмотра:", self.review_mode_combo)
 
         if self.settings_error:
             error_label = QLabel(f"Настройки не загружены: {self.settings_error}")
@@ -164,6 +189,7 @@ class SettingsScreen(QWidget):
         saved_theme = self.settings.get("theme", "light")
         if saved_theme in self.theme_buttons:
             self.theme_buttons[saved_theme].setChecked(True)
+        self.update_review_mode_state()
 
     # ── Public API ─────────────────────────────────────────────────────────────
 
@@ -191,12 +217,26 @@ class SettingsScreen(QWidget):
         self.settings["theme"] = theme_name
         self.theme_changed.emit(theme_name)
 
+    def update_review_mode_state(self) -> None:
+        demo_enabled = self.review_mode_combo.currentData() == "demo_minute"
+        self.skip_spin.setEnabled(not demo_enabled)
+
     def save_settings(self) -> None:
         """Persist current settings to disk."""
         self.settings["min_age_months"] = self.age_spin.value()
+        self.settings["min_size_bytes"] = self.size_spin.value() * 1024
         self.settings["skip_duration_days"] = self.skip_spin.value()
+        self.settings["skip_review_mode"] = self.review_mode_combo.currentData() or "days"
         try:
             save_user_settings(self.settings)
             QMessageBox.information(self, "Сохранено", "Настройки успешно сохранены.")
         except Exception as exc:
             QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить настройки:\n{exc}")
+
+
+def _bytes_to_kib_setting(value) -> int:
+    try:
+        bytes_value = int(value)
+    except (TypeError, ValueError):
+        bytes_value = config.DEFAULT_MIN_SIZE_BYTES
+    return max(1, bytes_value // 1024)

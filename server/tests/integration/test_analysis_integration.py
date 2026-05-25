@@ -88,8 +88,6 @@ async def test_missing_file_ids_filled_with_defaults(pg_client: AsyncClient, mon
 
     from services import ai_service
 
-    monkeypatch.setattr(ai_service, "AI_PROVIDER", "gemini")
-
     async def fake_gemini(user_prompt: str) -> str:
         # Extract the files from the prompt and classify only the first half.
         # Prompt format is "text\n\n...\n\n<json array>".

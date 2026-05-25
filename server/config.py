@@ -12,17 +12,30 @@ IS_PROD = ENV == "production"
 IS_TEST = ENV == "test"
 
 
-# ===== AI providers =====
+# ===== AI provider =====
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_API_URL = (
-    "https://generativelanguage.googleapis.com/v1beta/"
-    "models/gemini-1.5-flash:generateContent"
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
+GEMINI_FALLBACK_MODELS = [
+    model.strip()
+    for model in os.getenv(
+        "GEMINI_FALLBACK_MODELS",
+        "gemini-2.0-flash-lite",
+    ).split(",")
+    if model.strip()
+]
+GEMINI_API_BASE_URL = os.getenv(
+    "GEMINI_API_BASE_URL",
+    "https://generativelanguage.googleapis.com/v1beta",
 )
-
+XAI_API_KEY = os.getenv("XAI_API_KEY", "")
+XAI_MODEL = os.getenv("XAI_MODEL", "grok-3-mini")
+XAI_API_BASE_URL = os.getenv("XAI_API_BASE_URL", "https://api.x.ai/v1")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
-
-AI_PROVIDER = os.getenv("AI_PROVIDER", "gemini")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+GROQ_API_BASE_URL = os.getenv(
+    "GROQ_API_BASE_URL",
+    "https://api.groq.com/openai/v1",
+)
 
 
 # ===== JWT =====
@@ -49,6 +62,10 @@ CORS_ORIGINS = [
 MAX_FILES_PER_REQUEST = 200
 AI_TIMEOUT_SECONDS = 60
 AI_TEMPERATURE = 0.1
+AI_TOTAL_TIMEOUT_SECONDS = float(os.getenv("AI_TOTAL_TIMEOUT_SECONDS", "25.0"))
+AI_MAX_RETRIES = int(os.getenv("AI_MAX_RETRIES", "1"))
+AI_RETRY_BASE_SECONDS = float(os.getenv("AI_RETRY_BASE_SECONDS", "1.0"))
+AI_RETRY_MAX_SECONDS = float(os.getenv("AI_RETRY_MAX_SECONDS", "8.0"))
 
 # 1 MiB cap on request body — 200 file metadata records fit comfortably under this.
 MAX_REQUEST_BODY_BYTES = int(os.getenv("MAX_REQUEST_BODY_BYTES", str(1024 * 1024)))
@@ -99,7 +116,5 @@ if IS_PROD:
             "SQLite is not supported in production. "
             "Set DATABASE_URL to a PostgreSQL URL."
         )
-    if not GEMINI_API_KEY and AI_PROVIDER == "gemini":
-        _fatal("GEMINI_API_KEY is required when AI_PROVIDER=gemini in production")
-    if not GROQ_API_KEY and AI_PROVIDER == "groq":
-        _fatal("GROQ_API_KEY is required when AI_PROVIDER=groq in production")
+    if not GEMINI_API_KEY:
+        _fatal("GEMINI_API_KEY is required in production")

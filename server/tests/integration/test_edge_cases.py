@@ -14,7 +14,7 @@ from jose import jwt
 
 from config import JWT_ALGORITHM, JWT_SECRET
 from routers import analysis as analysis_router
-from tests.factories import analysis_payload, file_batch
+from tests.factories import file_batch
 
 
 def _auth(token: str) -> dict:

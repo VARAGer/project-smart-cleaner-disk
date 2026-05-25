@@ -375,6 +375,11 @@ def build_stylesheet(theme_name: str) -> str:
         background: transparent;
     }}
 
+    QScrollArea QWidget,
+    QScrollArea > QWidget > QWidget {{
+        background: transparent;
+    }}
+
     QScrollBar:vertical {{
         background: transparent;
         width: 12px;

@@ -2,7 +2,6 @@
 
 from datetime import datetime, timedelta, timezone
 
-import pytest
 from jose import jwt
 
 from config import JWT_ALGORITHM, JWT_SECRET

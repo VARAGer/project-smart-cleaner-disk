@@ -112,6 +112,16 @@ class TestLogin:
         assert response.status_code == 401
         assert response.json()["detail"] == "Invalid username or password"
 
+    async def test_short_password_returns_401_not_validation_error(
+        self, client: AsyncClient
+    ):
+        response = await client.post(
+            "/api/auth/login",
+            json={"username": "ghost", "password": "123"},
+        )
+        assert response.status_code == 401
+        assert response.json()["detail"] == "Invalid username or password"
+
     async def test_nonexistent_user_returns_401(self, client: AsyncClient):
         response = await client.post(
             "/api/auth/login",

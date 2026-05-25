@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt, pyqtSignal
+import logging
+
+from PyQt6.QtCore import QThread, Qt, pyqtSignal
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QHBoxLayout,
@@ -11,6 +13,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from client.api_client import ApiClientError, AuthSession, SmartCleanerApiClient
 from client.gui.auth_components import (
     FloatingArrowButton,
     GlassInputField,
@@ -22,14 +25,81 @@ from client.gui.auth_components import (
 from client.gui.theme import set_variant
 
 
+logger = logging.getLogger(__name__)
+
+
+def validate_auth_input(action: str, username: str, password: str) -> str | None:
+    if not username or not password:
+        return "Введите логин и пароль."
+
+    if action != "register":
+        return None
+
+    if len(username) < 3 or len(username) > 50:
+        return "Логин должен быть от 3 до 50 символов."
+    if not username.replace("_", "").isalnum():
+        return "Логин может содержать только буквы, цифры и _."
+
+    has_letter = any(c.isalpha() for c in password)
+    has_digit = any(c.isdigit() for c in password)
+    if len(password) < 10 or not (has_letter and has_digit):
+        return (
+            "Пароль должен быть не короче 10 символов и содержать хотя бы "
+            "одну букву и одну цифру."
+        )
+    return None
+
+
+class _AuthWorker(QThread):
+    succeeded = pyqtSignal(object)
+    failed = pyqtSignal(str)
+
+    def __init__(
+        self,
+        api_client: SmartCleanerApiClient,
+        action: str,
+        username: str,
+        password: str,
+    ):
+        super().__init__()
+        self._api_client = api_client
+        self._action = action
+        self._username = username
+        self._password = password
+
+    def run(self) -> None:
+        try:
+            if self._action == "register":
+                session = self._api_client.register(
+                    self._username,
+                    self._password,
+                )
+            else:
+                session = self._api_client.login(
+                    self._username,
+                    self._password,
+                )
+        except ApiClientError as e:
+            self.failed.emit(str(e))
+            return
+        except Exception:
+            logger.exception("Unexpected client authentication failure")
+            self.failed.emit("Не удалось подключиться к backend.")
+            return
+        self.succeeded.emit(session)
+
+
 class LoginScreen(QWidget):
     login_successful = pyqtSignal()
     theme_requested = pyqtSignal(str)
 
-    def __init__(self):
+    def __init__(self, api_client: SmartCleanerApiClient | None = None):
         super().__init__()
         self.setObjectName("loginScreen")
         self._current_theme = "light"
+        self.api_client = api_client or SmartCleanerApiClient()
+        self.auth_session: AuthSession | None = None
+        self._auth_worker: _AuthWorker | None = None
 
         # Decorative background orbs
         self.left_orb = GlowOrb(QColor(71, 245, 212, 90), 260, self)
@@ -89,7 +159,7 @@ class LoginScreen(QWidget):
         subtitle.setObjectName("loginSubtitle")
         subtitle.setWordWrap(True)
 
-        self.username_field = GlassInputField("Логин или email")
+        self.username_field = GlassInputField("Логин")
         self.password_field = GlassInputField("Пароль", password=True)
 
         self.username_input = self.username_field.line_edit
@@ -155,17 +225,50 @@ class LoginScreen(QWidget):
     # ── Private ────────────────────────────────────────────────────────────────
 
     def _handle_login(self) -> None:
-        username = self.username_input.text().strip()
-        password = self.password_input.text()
-        if not username or not password:
-            QMessageBox.warning(self, "Ошибка", "Введите логин и пароль.")
-            return
-        # TODO: подключить реальную аутентификацию через backend
-        self.login_successful.emit()
+        self._start_auth("login")
 
     def _handle_register(self) -> None:
-        QMessageBox.information(
+        self._start_auth("register")
+
+    def _start_auth(self, action: str) -> None:
+        if self._auth_worker is not None:
+            return
+
+        username = self.username_input.text().strip()
+        password = self.password_input.text()
+        validation_error = validate_auth_input(action, username, password)
+        if validation_error:
+            QMessageBox.warning(self, "Ошибка", validation_error)
+            return
+
+        self._set_auth_busy(True)
+        worker = _AuthWorker(self.api_client, action, username, password)
+        worker.succeeded.connect(self._handle_auth_success)
+        worker.failed.connect(self._handle_auth_failure)
+        worker.finished.connect(worker.deleteLater)
+        worker.finished.connect(self._clear_auth_worker)
+        self._auth_worker = worker
+        worker.start()
+
+    def _handle_auth_success(self, session: AuthSession) -> None:
+        self.auth_session = session
+        self._set_auth_busy(False)
+        self.login_successful.emit()
+
+    def _handle_auth_failure(self, message: str) -> None:
+        self._set_auth_busy(False)
+        QMessageBox.warning(
             self,
-            "Регистрация",
-            "Создание локального профиля будет доступно после подключения backend.",
+            "Ошибка авторизации",
+            message,
         )
+
+    def _clear_auth_worker(self) -> None:
+        self._auth_worker = None
+
+    def _set_auth_busy(self, busy: bool) -> None:
+        self.username_input.setEnabled(not busy)
+        self.password_input.setEnabled(not busy)
+        self.login_button.setEnabled(not busy)
+        self.register_button.setEnabled(not busy)
+        self.login_button.setText("..." if busy else "→")
