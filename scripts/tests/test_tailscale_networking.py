@@ -78,6 +78,15 @@ def test_public_start_script_uses_cloudflare_quick_tunnel():
     assert "build_client_installer.ps1" in script
 
 
+def test_installer_resets_local_client_database_for_demo():
+    script = read_text("deployment/client-installer/SmartCleaner.iss")
+
+    assert "[InstallDelete]" in script
+    assert r"{localappdata}\SmartCleaner\smartcleaner.db" in script
+    assert r"{localappdata}\SmartCleaner\smartcleaner.db-wal" in script
+    assert r"{localappdata}\SmartCleaner\smartcleaner.db-shm" in script
+
+
 def test_demo_dataset_script_creates_bounded_old_file_set():
     script = read_text("scripts/create_demo_dataset.ps1")
 

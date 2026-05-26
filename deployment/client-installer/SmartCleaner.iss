@@ -24,6 +24,11 @@ UninstallDisplayIcon={app}\SmartCleaner.exe
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
+[InstallDelete]
+Type: files; Name: "{localappdata}\SmartCleaner\smartcleaner.db"
+Type: files; Name: "{localappdata}\SmartCleaner\smartcleaner.db-wal"
+Type: files; Name: "{localappdata}\SmartCleaner\smartcleaner.db-shm"
+
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 #ifdef BackendUrlFile

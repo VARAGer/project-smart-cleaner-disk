@@ -31,6 +31,7 @@ client/data/
 # Build outputs
 build/
 dist/
+docs/
 deployment/client-installer/output/
 deployment/client-installer/temp/
 *.spec.bak
@@ -46,4 +47,3 @@ graphify-out/
 *.md
 .codex_tmp/
 graphify-out-current/
-docs/
